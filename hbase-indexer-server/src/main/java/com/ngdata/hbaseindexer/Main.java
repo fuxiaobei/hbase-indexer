@@ -63,18 +63,18 @@ public class Main {
             }
         };
         try {
-        if(d.isDaemonized()) {
-            // perform initialization as a daemon
-            // this involves in closing file descriptors, recording PIDs, etc.
-            d.init();
-        } else {
-            // if you are already daemonized, no point in daemonizing yourself again,
-            // so do this only when you aren't daemonizing.
-            if(args != null && args.length > 0 && "daemon".equals(args[0])) {
-                d.daemonize();
-                System.exit(0);
+            if(d.isDaemonized()) {
+                // perform initialization as a daemon
+                // this involves in closing file descriptors, recording PIDs, etc.
+                d.init();
+            } else {
+                // if you are already daemonized, no point in daemonizing yourself again,
+                // so do this only when you aren't daemonizing.
+                if(args != null && args.length > 0 && "daemon".equals(args[0])) {
+                    d.daemonize();
+                    System.exit(0);
+                }
             }
-        }
         } catch (Exception e) {
             log.error("Error setting up hbase-indexer daemon", e);
             System.exit(1);
@@ -83,7 +83,7 @@ public class Main {
         try {
             new Main().run(args);
         } catch (Exception e) {
-            log.error(e);
+            log.error("starting exception", e);
             System.exit(1);
         }
     }
@@ -129,14 +129,14 @@ public class Main {
                 indexerProcessRegistry, tablePool, conf);
 
         indexerSupervisor.init();
-        startHttpServer();
+        startHttpServer(conf);
 
     }
 
-    private void startHttpServer() throws Exception {
+    private void startHttpServer(Configuration conf) throws Exception {
         server = new Server();
         SelectChannelConnector selectChannelConnector = new SelectChannelConnector();
-        selectChannelConnector.setPort(11060);
+        selectChannelConnector.setPort(conf.getInt("http.server.port", 11060));
         server.setConnectors(new Connector[]{selectChannelConnector});
 
         PackagesResourceConfig packagesResourceConfig = new PackagesResourceConfig("com/ngdata/hbaseindexer/rest");
