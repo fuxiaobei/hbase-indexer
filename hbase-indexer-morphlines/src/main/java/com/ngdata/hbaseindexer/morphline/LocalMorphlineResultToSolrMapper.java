@@ -36,6 +36,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.common.SolrInputDocument;
 import org.kitesdk.morphline.api.Command;
 import org.kitesdk.morphline.api.MorphlineCompilationException;
+import org.kitesdk.morphline.api.MorphlineRuntimeException;
 import org.kitesdk.morphline.api.Record;
 import org.kitesdk.morphline.base.Compiler;
 import org.kitesdk.morphline.base.*;
@@ -43,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.Map.Entry;
@@ -66,6 +68,8 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
     private Meter numFailedRecords;
     private Meter numExceptionRecords;
 
+    private LogWriter logWriter;
+
 //    private Config override;
 
     /**
@@ -76,6 +80,8 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
     private static final Logger LOG = LoggerFactory.getLogger(LocalMorphlineResultToSolrMapper.class);
 
     public LocalMorphlineResultToSolrMapper() {
+        logWriter = new LogWriter();
+        LOG.info("init logWriter");
     }
 
     @Override
@@ -121,6 +127,7 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
                 override);
 
         /*********************************************add new***************************************************************/
+        logWriter.setConfig(params);
         try {
             Class c = Class.forName("org.kitesdk.morphline.stdlib.Pipe");
             Method method = c.getDeclaredMethod("getChild");
@@ -246,9 +253,26 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
                     numFailedRecords.mark();
                     LOG.warn("Morphline {} failed to process record: {}", morphlineFileAndId, record);
                 }
+                /*********************************************modify***************************************************************/
+                try {
+                    logWriter.logRightRecord(result, record);
+
+                } catch (IOException e) {
+                    throw new MorphlineRuntimeException(e);
+                }
+                /*********************************************modify***************************************************************/
+
             } catch (RuntimeException t) {
                 numExceptionRecords.mark();
                 morphlineContext.getExceptionHandler().handleException(t, record);
+                /*********************************************modify***************************************************************/
+                try {
+                    logWriter.logErrorRecord(result, record);
+
+                } catch (IOException e) {
+                    throw new MorphlineRuntimeException(e);
+                }
+                /*********************************************modify***************************************************************/
             }
         } finally {
             collector.reset(null);
@@ -307,12 +331,14 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
         private SolrInputDocument convert(Record record) {
             Map<String, Collection<Object>> map = record.getFields().asMap();
             SolrInputDocument doc = new SolrInputDocument(new HashMap(2 * map.size()));
+            /*********************************************modify***************************************************************/
+            doc.addField("content_type", "p");
+            /*********************************************end***************************************************************/
             for (Map.Entry<String, Collection<Object>> entry : map.entrySet()) {
                 /*********************************************modify***************************************************************/
                 if(fieldType.get(entry.getKey()).equals("com.ngdata.hbaseindexer.parse.JsonByteArrayValueMapper")
                         && entry.getValue().size() > 0) {
                     processNestedDoc(doc, entry.getKey(), (String) entry.getValue().iterator().next());
-                    doc.addField("content_type", "p");
                 } else {
                     doc.setField(entry.getKey(), entry.getValue());
                 }

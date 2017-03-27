@@ -140,6 +140,7 @@ public abstract class Indexer {
     public void indexRowData(List<RowData> rowDataList) throws IOException, SolrServerException, SharderException {
         SolrUpdateCollector updateCollector = new SolrUpdateCollector(rowDataList.size());
         TimerContext timerContext = indexingTimer.time();
+        ThreadLocalCollection.setCollection(indexerName);
         try {
             calculateIndexUpdates(rowDataList, updateCollector);
         } finally {
