@@ -1,3 +1,5 @@
+package com.ngdata.hbaseindexer.indexer;
+
 /*
  * Copyright 2013 Cloudera Inc.
  *
@@ -13,10 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.ngdata.hbaseindexer.morphline;
 
-import com.google.gson.Gson;
-import com.ngdata.hbaseindexer.indexer.ThreadLocalCollection;
+
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -24,16 +24,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellScanner;
 import org.apache.hadoop.hbase.client.Result;
-import org.kitesdk.morphline.api.Record;
+import org.apache.solr.common.SolrInputDocument;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.text.SimpleDateFormat;
+import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -42,10 +40,12 @@ public class LogWriter {
 
     public static final Log LOG = LogFactory.getLog(LogWriter.class);
 
+    String writerId;
     Map<String, String> config;
     FSDataOutputStream rightOut;
     FSDataOutputStream errorOut;
     SimpleDateFormat format = new SimpleDateFormat("yyyyMMddHH");
+    SimpleDateFormat formatSS = new SimpleDateFormat("yyyyMMddHHmmss");
     String baseLogPath;
     volatile String currentDate;
     String rightFileName;
@@ -55,17 +55,24 @@ public class LogWriter {
     String processName;
     String indexName;
     String threadName;
+    String family;
+    String tableName;
     FileSystem fs;
     ReentrantLock lock;
     boolean init;
     boolean enableRightLog = false; //default disabled
     boolean enableErrorLog = true; //default enabled
     int flushInterval = 30 * 1000;
-    Gson gson = new Gson();
-    Map<String, String> record = new HashMap<String, String>();
+    StringBuffer sb = new StringBuffer();
 
-    public LogWriter() {
+    public LogWriter(String indexName, String tableName, String writerId) {
+        this.indexName = indexName;
+        this.tableName = tableName;
+        this.writerId = writerId;
+    }
 
+    public String getWriterId() {
+        return writerId;
     }
 
     public synchronized void setConfig(Map<String, String> config) {
@@ -86,8 +93,8 @@ public class LogWriter {
         }
 
         processName = ManagementFactory.getRuntimeMXBean().getName();
-        indexName = ThreadLocalCollection.getCollection();
         threadName = Thread.currentThread().getName();
+        family = config.get("family");
         initFileNames();
         try {
             fs = FileSystem.get(new Configuration());
@@ -132,6 +139,10 @@ public class LogWriter {
         return format.format(new Date());
     }
 
+    public String current() {
+        return formatSS.format(new Date());
+    }
+
 
     public boolean needRollLog() {
         return !currentDate.equals(now());
@@ -163,40 +174,77 @@ public class LogWriter {
     }
 
 
-    public void logRightRecord(Result result, Record record) throws IOException {
+//    public void logRightRecord(Result result) throws IOException {
+//        if(!enableRightLog) return;
+//        lock.lock();
+//        try {
+//            initRightOutput();
+//            rightOut.write((getString(result) + "\n").getBytes());
+//        } finally {
+//            lock.unlock();
+//        }
+//    }
+
+
+    public void logRightRecord(Collection<SolrInputDocument> inputDocuments) throws IOException {
         if(!enableRightLog) return;
         lock.lock();
         try {
             initRightOutput();
-            rightOut.write((getString(result) + "\n").getBytes());
+            write(rightOut, inputDocuments);
         } finally {
             lock.unlock();
         }
     }
 
-
-    public void logErrorRecord(Result result, Record record) throws IOException {
+    public void logErrorRecord(SolrInputDocument doc) throws IOException {
         if(!enableErrorLog) return;
         lock.lock();
         try {
             initErrorOutput();
-            errorOut.write((getString(result) + "\n").getBytes());
+            write(errorOut, doc);
         } finally {
             lock.unlock();
         }
     }
 
-    public String getString(Result result) throws IOException {
-        record.clear();
-        CellScanner cs = result.cellScanner();
-        while(cs.advance()) {
-            Cell cell = cs.current();
-            byte[] value = cell.getValueArray();
-            record.put(new String(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength()),
-                    value == null ? "" : new String(value, cell.getValueOffset(), cell.getValueLength()));
+    public void write(FSDataOutputStream out, Collection<SolrInputDocument> inputDocuments) throws IOException {
+        for(SolrInputDocument doc : inputDocuments) {
+            write(out, doc);
         }
+    }
 
-        return gson.toJson(record);
+    public void write(FSDataOutputStream out, SolrInputDocument doc) throws IOException {
+        sb.setLength(0);
+        sb.append("time=").append(current()).append("***")
+                .append("collectionName=").append(indexName).append("***")
+                .append("rowKey=").append(doc.getFieldValue("id")).append("***")
+                .append("applicationNum=").append(doc.getFieldValue("full-applicationNum")).append("***")
+                .append("hbaseTableName=").append(tableName);
+        out.write((sb.toString() + "\n").getBytes());
+    }
+
+
+
+    public void logErrorRecord(Result result, String applicationNum) throws IOException {
+        if(!enableErrorLog) return;
+        lock.lock();
+        try {
+            initErrorOutput();
+            errorOut.write((getString(result, applicationNum) + "\n").getBytes());
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String getString(Result result, String applicationNum) throws IOException {
+        sb.setLength(0);
+        sb.append("time=").append(current()).append("***")
+                .append("collectionName=").append(indexName).append("***")
+                .append("rowKey=").append(new String(result.getRow())).append("***")
+                .append("applicationNum=").append(applicationNum).append("***")
+                .append("hbaseTableName=").append(tableName);
+        return sb.toString();
     }
 
 
@@ -273,3 +321,4 @@ public class LogWriter {
     }
 
 }
+

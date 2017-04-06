@@ -23,6 +23,10 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.gson.Gson;
 import com.ngdata.hbaseindexer.Configurable;
+import com.ngdata.hbaseindexer.indexer.IdAddingSolrUpdateWriter;
+import com.ngdata.hbaseindexer.indexer.LogWriter;
+import com.ngdata.hbaseindexer.indexer.RowAndFamilyAddingSolrUpdateWriter;
+import com.ngdata.hbaseindexer.indexer.ThreadLocalContext;
 import com.ngdata.hbaseindexer.parse.ByteArrayExtractor;
 import com.ngdata.hbaseindexer.parse.ResultToSolrMapper;
 import com.ngdata.hbaseindexer.parse.SolrUpdateWriter;
@@ -68,7 +72,8 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
     private Meter numFailedRecords;
     private Meter numExceptionRecords;
 
-    private LogWriter logWriter;
+//    private LogWriter2 logWriter;
+
 
 //    private Config override;
 
@@ -80,8 +85,8 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
     private static final Logger LOG = LoggerFactory.getLogger(LocalMorphlineResultToSolrMapper.class);
 
     public LocalMorphlineResultToSolrMapper() {
-        logWriter = new LogWriter();
-        LOG.info("init logWriter");
+//        logWriter = new LogWriter2();
+//        LOG.info("init logWriter");
     }
 
     @Override
@@ -127,7 +132,7 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
                 override);
 
         /*********************************************add new***************************************************************/
-        logWriter.setConfig(params);
+//        logWriter.setConfig(params);
         try {
             Class c = Class.forName("org.kitesdk.morphline.stdlib.Pipe");
             Method method = c.getDeclaredMethod("getChild");
@@ -251,26 +256,48 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
                 Notifications.notifyStartSession(morphline);
                 if (!morphline.process(record)) {
                     numFailedRecords.mark();
-                    LOG.warn("Morphline {} failed to process record: {}", morphlineFileAndId, record);
+                    LOG.warn("Morphline {} failed to process oneRecord: {}", morphlineFileAndId, record);
                 }
-                /*********************************************modify***************************************************************/
-                try {
-                    logWriter.logRightRecord(result, record);
-
-                } catch (IOException e) {
-                    throw new MorphlineRuntimeException(e);
-                }
-                /*********************************************modify***************************************************************/
+//                /*********************************************modify***************************************************************/
+//                try {
+//                    if(solrUpdateWriter instanceof IdAddingSolrUpdateWriter) {
+//                        logWriter.logRightRecord(((IdAddingSolrUpdateWriter) solrUpdateWriter).getTableName() ,result, record);
+//                    } else {
+//                        RowAndFamilyAddingSolrUpdateWriter writer = (RowAndFamilyAddingSolrUpdateWriter) solrUpdateWriter;
+//                        IdAddingSolrUpdateWriter delegateWriter = (IdAddingSolrUpdateWriter) writer.getDelegateUpdateWriter();
+//                        logWriter.logRightRecord(delegateWriter.getTableName(), result, record);
+//                    }
+//                } catch (IOException e) {
+//                    throw new MorphlineRuntimeException(e);
+//                }
+//                /*********************************************modify***************************************************************/
 
             } catch (RuntimeException t) {
                 numExceptionRecords.mark();
                 morphlineContext.getExceptionHandler().handleException(t, record);
                 /*********************************************modify***************************************************************/
-                try {
-                    logWriter.logErrorRecord(result, record);
-
-                } catch (IOException e) {
-                    throw new MorphlineRuntimeException(e);
+//                try {
+//                    if(solrUpdateWriter instanceof IdAddingSolrUpdateWriter) {
+//                        logWriter.logErrorRecord(((IdAddingSolrUpdateWriter) solrUpdateWriter).getTableName(), result, record);
+//                    } else {
+//                        RowAndFamilyAddingSolrUpdateWriter writer = (RowAndFamilyAddingSolrUpdateWriter) solrUpdateWriter;
+//                        IdAddingSolrUpdateWriter delegateWriter = (IdAddingSolrUpdateWriter) writer.getDelegateUpdateWriter();
+//                        logWriter.logErrorRecord(delegateWriter.getTableName(), result, record);
+//                    }
+//                } catch (IOException e) {
+//                    throw new MorphlineRuntimeException(e);
+//                }
+                if(ThreadLocalContext.getContext() != null ) {
+                    LogWriter logWriter = (LogWriter) ThreadLocalContext.getContext().get("logWriter");
+                    if(logWriter != null) {
+                        String applicationNum = record.get("full-applicationNum") != null && record.get("full-applicationNum").size() > 0
+                                ? (String)record.get("full-applicationNum").get(0): "";
+                        try {
+                            logWriter.logErrorRecord(result, applicationNum);
+                        } catch (IOException e) {
+                            throw new MorphlineRuntimeException(e);
+                        }
+                    }
                 }
                 /*********************************************modify***************************************************************/
             }

@@ -50,10 +50,7 @@ import org.apache.solr.common.SolrInputDocument;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
@@ -76,6 +73,7 @@ public abstract class Indexer {
     protected UniqueKeyFormatter uniqueKeyFormatter;
     private Timer indexingTimer;
 
+//    private LogWriter logWriter;
 
     /**
      * Instantiate an indexer based on the given {@link IndexerConf}.
@@ -110,7 +108,8 @@ public abstract class Indexer {
         this.indexingTimer = Metrics.newTimer(metricName(getClass(),
                 "Index update calculation timer", indexerName),
                 TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-
+//        logWriter = new LogWriter(indexerName, tableName);
+//        System.out.println("~~~~init indexer: " + logWriter);
     }
 
     /**
@@ -140,7 +139,20 @@ public abstract class Indexer {
     public void indexRowData(List<RowData> rowDataList) throws IOException, SolrServerException, SharderException {
         SolrUpdateCollector updateCollector = new SolrUpdateCollector(rowDataList.size());
         TimerContext timerContext = indexingTimer.time();
-        ThreadLocalCollection.setCollection(indexerName);
+
+        LogWriter logWriter = null;
+
+        /*********************************************modify***************************************************************/
+        //        logWriter.setConfig(conf.getGlobalParams());
+        if (ThreadLocalContext.getContext() == null) {
+            LogWriterPool logWriterPool = LogWriterPool.getInstance(conf.getGlobalParams());
+            logWriter = logWriterPool.get(indexerName, tableName);
+            Map<String, Object> context = new HashMap<String, Object>();
+            context.put("collection", indexerName);
+            context.put("logWriter", logWriter);
+            ThreadLocalContext.setContext(context);
+        }
+        /*********************************************modify***************************************************************/
         try {
             calculateIndexUpdates(rowDataList, updateCollector);
         } finally {
@@ -178,6 +190,7 @@ public abstract class Indexer {
         for (String deleteQuery : updateCollector.getDeleteQueries()) {
             solrWriter.deleteByQuery(deleteQuery);
         }
+
 
     }
 

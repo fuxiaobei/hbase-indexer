@@ -16,16 +16,19 @@
 package com.ngdata.hbaseindexer.indexer;
 
 
-public class ThreadLocalCollection {
+import java.util.Map;
+
+public class ThreadLocalContext {
 
     public static ThreadLocal local = new ThreadLocal();
 
-    public static void setCollection(String name) {
-        local.set(name);
+
+    public static void setContext(Map<String, Object> context) {
+        local.set(context);
     }
 
 
-    public static String getCollection() {
-        return (String) local.get();
+    public static Map<String, Object> getContext() {
+        return (Map<String, Object>) local.get();
     }
 }

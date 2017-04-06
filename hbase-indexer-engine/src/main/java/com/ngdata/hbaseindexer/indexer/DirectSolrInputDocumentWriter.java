@@ -83,9 +83,21 @@ public class DirectSolrInputDocumentWriter implements SolrInputDocumentWriter {
         return e.code() == ErrorCode.BAD_REQUEST.code;
     }
 
-    private void logOrThrowSolrException(SolrException solrException) {
+    private void logOrThrowSolrException(SolrException solrException, SolrInputDocument inputDocument) {
         if (isDocumentIssue(solrException)) {
             log.error("Error updating Solr", solrException);
+            /*********************************************modify***************************************************************/
+            if(ThreadLocalContext.getContext() != null && inputDocument != null) {
+                LogWriter logWriter = (LogWriter) ThreadLocalContext.getContext().get("logWriter");
+                if(logWriter != null) {
+                    try {
+                        logWriter.logErrorRecord(inputDocument);
+                    } catch (IOException e) {
+                        throw new RuntimeException("logWriter log error record exception", e);
+                    }
+                }
+            }
+            /*********************************************modify***************************************************************/
         } else {
             throw solrException;
         }
@@ -103,6 +115,14 @@ public class DirectSolrInputDocumentWriter implements SolrInputDocumentWriter {
         try {
             solrServer.add(inputDocuments);
             indexAddMeter.mark(inputDocuments.size());
+            /*********************************************modify***************************************************************/
+            if(ThreadLocalContext.getContext() != null ) {
+                LogWriter logWriter = (LogWriter) ThreadLocalContext.getContext().get("logWriter");
+                if(logWriter != null) {
+                    logWriter.logRightRecord(inputDocuments);
+                }
+            }
+            /*********************************************modify***************************************************************/
         } catch (SolrException e) {
             if (isDocumentIssue(e)) {
                 retryAddsIndividually(inputDocuments);
@@ -123,7 +143,7 @@ public class DirectSolrInputDocumentWriter implements SolrInputDocumentWriter {
                 solrServer.add(inputDocument);
                 indexAddMeter.mark();
             } catch (SolrException e) {
-                logOrThrowSolrException(e);
+                logOrThrowSolrException(e, inputDocument);
                 // No exception thrown through, so we can update the metric
                 documentAddErrorMeter.mark();
             }
@@ -160,7 +180,7 @@ public class DirectSolrInputDocumentWriter implements SolrInputDocumentWriter {
                 solrServer.deleteById(idToDelete);
                 indexDeleteMeter.mark();
             } catch (SolrException e) {
-                logOrThrowSolrException(e);
+                logOrThrowSolrException(e, null);
                 // No exception thrown through, so we can update the metric
                 documentDeleteErrorMeter.mark();
             }
