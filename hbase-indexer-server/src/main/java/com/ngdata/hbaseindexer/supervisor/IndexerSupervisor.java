@@ -196,6 +196,10 @@ public class IndexerSupervisor {
             // Create and register the indexer
             IndexerComponentFactory factory = IndexerComponentFactoryUtil.getComponentFactory(indexerDef.getIndexerComponentFactory(), new ByteArrayInputStream(indexerDef.getConfiguration()), indexerDef.getConnectionParams());
             IndexerConf indexerConf = factory.createIndexerConf();
+            /*********************************************add***************************************************************/
+            indexerConf.setHbaseConf(hbaseConf);
+            indexerConf.setConnectionParams(indexerDef.getConnectionParams());
+            /*********************************************add***************************************************************/
 
             ResultToSolrMapper mapper = factory.createMapper(indexerDef.getName());
 

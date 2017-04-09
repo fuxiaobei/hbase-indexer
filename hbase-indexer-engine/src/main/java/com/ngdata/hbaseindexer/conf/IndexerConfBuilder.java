@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import com.ngdata.hbaseindexer.conf.FieldDefinition.ValueSource;
 import com.ngdata.hbaseindexer.parse.ResultToSolrMapper;
 import com.ngdata.hbaseindexer.uniquekey.UniqueKeyFormatter;
+import org.apache.hadoop.conf.Configuration;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -42,6 +43,10 @@ public class IndexerConfBuilder {
     private List<FieldDefinition> fieldDefinitions = Lists.newArrayList();
     private List<DocumentExtractDefinition> documentExtractDefinitions = Lists.newArrayList();
     private Map<String, String> globalParams = Maps.newHashMap();
+    /*********************************************modify***************************************************************/
+    private Configuration hbaseConf;
+    private Map<String, String> connectionParams = Maps.newHashMap();
+    /*********************************************modify***************************************************************/
 
     /**
      * Default constructor.
@@ -68,6 +73,10 @@ public class IndexerConfBuilder {
         this.fieldDefinitions = Lists.newArrayList(indexerConf.getFieldDefinitions());
         this.documentExtractDefinitions = Lists.newArrayList(indexerConf.getDocumentExtractDefinitions());
         this.globalParams = Maps.newHashMap(indexerConf.getGlobalParams());
+        /*********************************************modify***************************************************************/
+        this.hbaseConf = indexerConf.getHbaseConf();
+        this.connectionParams = indexerConf.getConnectionParams();
+        /*********************************************modify***************************************************************/
     }
 
     public IndexerConfBuilder table(String table) {
@@ -151,6 +160,10 @@ public class IndexerConfBuilder {
         conf.setFieldDefinitions(fieldDefinitions);
         conf.setDocumentExtractDefinitions(documentExtractDefinitions);
         conf.setGlobalParams(globalParams);
+        /*********************************************modify***************************************************************/
+        conf.setHbaseConf(hbaseConf);
+        conf.setConnectionParams(connectionParams);
+        /*********************************************modify***************************************************************/
         return conf;
     }
 }

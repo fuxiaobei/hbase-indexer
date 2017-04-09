@@ -25,6 +25,7 @@ import com.ngdata.hbaseindexer.conf.FieldDefinition.ValueSource;
 import com.ngdata.hbaseindexer.indexer.Indexer;
 import com.ngdata.hbaseindexer.uniquekey.StringUniqueKeyFormatter;
 import com.ngdata.hbaseindexer.uniquekey.UniqueKeyFormatter;
+import org.apache.hadoop.conf.Configuration;
 
 /**
  * The configuration for an indexer, i.e. this defines the behavior of the {@link Indexer} and of the parser/mapper
@@ -47,6 +48,11 @@ public class IndexerConf {
     private List<FieldDefinition> fieldDefinitions;
     private List<DocumentExtractDefinition> extractDefinitions;
     private Map<String, String> globalParams;
+
+    /*********************************************modify***************************************************************/
+    private Configuration hbaseConf;
+    private Map<String, String> connectionParams;
+    /*********************************************modify***************************************************************/
 
     public enum MappingType { ROW, COLUMN }
 
@@ -221,5 +227,21 @@ public class IndexerConf {
         this.globalParams = globalParams;
     }
 
-   
+    /*********************************************modify***************************************************************/
+    public Configuration getHbaseConf() {
+        return hbaseConf;
+    }
+
+    public void setHbaseConf(Configuration hbaseConf) {
+        this.hbaseConf = hbaseConf;
+    }
+
+    public Map<String, String> getConnectionParams() {
+        return connectionParams;
+    }
+
+    public void setConnectionParams(Map<String, String> connectionParams) {
+        this.connectionParams = connectionParams;
+    }
+    /*********************************************modify***************************************************************/
 }

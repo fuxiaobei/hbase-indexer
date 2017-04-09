@@ -16,30 +16,31 @@ package com.ngdata.hbaseindexer.indexer;
  * limitations under the License.
  */
 
+import com.ngdata.hbaseindexer.conf.IndexerConf;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Created by wangkai8 on 17/4/6.
- */
+
+/*********************************************new***************************************************************/
 public class LogWriterPool {
 
     private static LogWriterPool pool;
     private static Object lock = new Object();
-    private Map<String, String> config;
+    private IndexerConf conf;
     private ConcurrentHashMap<String, LogWriter> map = new ConcurrentHashMap<String, LogWriter>();
 
 
-    private LogWriterPool(Map<String, String> config) {
-        this.config = config;
+    private LogWriterPool(IndexerConf conf) {
+        this.conf = conf;
     }
 
 
-    public static LogWriterPool getInstance(Map<String, String> config) {
+    public static LogWriterPool getInstance(IndexerConf conf) {
         if(pool == null) {
             synchronized (lock) {
                 if(pool == null) {
-                    pool = new LogWriterPool(config);
+                    pool = new LogWriterPool(conf);
                 }
             }
         }
@@ -50,15 +51,11 @@ public class LogWriterPool {
         String key = indexerName + "|" + table + "|" + Thread.currentThread().getName();
         LogWriter writer = map.get(key);
         if(writer == null) {
-            writer = new LogWriter(indexerName, table, key);
-            writer.setConfig(config);
+            writer = new LogWriter(conf, indexerName, table, key);
+            writer.setConfig(conf.getGlobalParams());
             map.put(key, writer);
         }
         return writer;
-    }
-
-    public void returnPool(LogWriter writer) {
-        map.put(writer.getWriterId(), writer);
     }
 
 }

@@ -190,7 +190,10 @@ public class HBaseIndexerMapper extends TableMapper<Text, SolrInputDocumentWrita
         Map<String, String> indexConnectionParams = getIndexConnectionParams(context.getConfiguration());
         IndexerComponentFactory factory = IndexerComponentFactoryUtil.getComponentFactory(indexerComponentFactory, new ByteArrayInputStream(indexConfiguration.getBytes(Charsets.UTF_8)), indexConnectionParams);
         IndexerConf indexerConf = factory.createIndexerConf();
-
+        /*********************************************add***************************************************************/
+        indexerConf.setHbaseConf(context.getConfiguration());
+        indexerConf.setConnectionParams(indexConnectionParams);
+        /*********************************************add***************************************************************/
         String morphlineFile = context.getConfiguration().get(MorphlineResultToSolrMapper.MORPHLINE_FILE_PARAM);
         Map<String, String> params = indexerConf.getGlobalParams();
         if (morphlineFile != null) {
@@ -221,7 +224,6 @@ public class HBaseIndexerMapper extends TableMapper<Text, SolrInputDocumentWrita
             indexerConf = new IndexerConfBuilder(indexerConf).rowReadMode(RowReadMode.NEVER).build();
         }
         indexerConf.setGlobalParams(params);
-
         try {
             indexer = createIndexer(indexName, context, indexerConf, tableName, mapper, indexConnectionParams);
         } catch (SharderException e) {

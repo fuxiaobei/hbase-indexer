@@ -17,10 +17,12 @@ package com.ngdata.hbaseindexer.indexer;
  */
 
 
+import com.google.common.collect.ListMultimap;
+import com.ngdata.hbaseindexer.SolrConnectionParams;
+import com.ngdata.hbaseindexer.conf.IndexerConf;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -32,10 +34,11 @@ import java.lang.management.ManagementFactory;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
-
+/*********************************************new***************************************************************/
 public class LogWriter {
 
     public static final Log LOG = LogFactory.getLog(LogWriter.class);
@@ -53,10 +56,11 @@ public class LogWriter {
     String totalRightFileName;
     String totalErrorFileName;
     String processName;
+    String collectionName;
     String indexName;
     String threadName;
-    String family;
     String tableName;
+    IndexerConf conf;
     FileSystem fs;
     ReentrantLock lock;
     boolean init;
@@ -64,11 +68,14 @@ public class LogWriter {
     boolean enableErrorLog = true; //default enabled
     int flushInterval = 30 * 1000;
     StringBuffer sb = new StringBuffer();
+    String[] logFields;
 
-    public LogWriter(String indexName, String tableName, String writerId) {
+    public LogWriter(IndexerConf conf, String indexName, String tableName, String writerId) {
         this.indexName = indexName;
         this.tableName = tableName;
         this.writerId = writerId;
+        this.conf = conf;
+        this.collectionName = conf.getConnectionParams().get(SolrConnectionParams.COLLECTION);
     }
 
     public String getWriterId() {
@@ -91,13 +98,15 @@ public class LogWriter {
         if(config.containsKey("enableRightLog")) {
             this.enableRightLog = Boolean.parseBoolean(config.get("enableRightLog"));
         }
+        if(config.containsKey("logFields")) {
+            this.logFields = config.get("logFields").split(",");
+        }
 
         processName = ManagementFactory.getRuntimeMXBean().getName();
         threadName = Thread.currentThread().getName();
-        family = config.get("family");
         initFileNames();
         try {
-            fs = FileSystem.get(new Configuration());
+            fs = FileSystem.get(conf.getHbaseConf());
         } catch (IOException e) {
             throw new RuntimeException("get fileSystem exception", e);
         }
@@ -174,18 +183,6 @@ public class LogWriter {
     }
 
 
-//    public void logRightRecord(Result result) throws IOException {
-//        if(!enableRightLog) return;
-//        lock.lock();
-//        try {
-//            initRightOutput();
-//            rightOut.write((getString(result) + "\n").getBytes());
-//        } finally {
-//            lock.unlock();
-//        }
-//    }
-
-
     public void logRightRecord(Collection<SolrInputDocument> inputDocuments) throws IOException {
         if(!enableRightLog) return;
         lock.lock();
@@ -215,35 +212,53 @@ public class LogWriter {
     }
 
     public void write(FSDataOutputStream out, SolrInputDocument doc) throws IOException {
+//        sb.setLength(0);
+//        sb.append("time=").append(current()).append("***")
+//                .append("collectionName=").append(indexName).append("***")
+//                .append("rowKey=").append(doc.getFieldValue("id")).append("***")
+//                .append("applicationNum=").append(doc.getFieldValue("full-applicationNum")).append("***")
+//                .append("hbaseTableName=").append(tableName);
         sb.setLength(0);
         sb.append("time=").append(current()).append("***")
-                .append("collectionName=").append(indexName).append("***")
-                .append("rowKey=").append(doc.getFieldValue("id")).append("***")
-                .append("applicationNum=").append(doc.getFieldValue("full-applicationNum")).append("***")
-                .append("hbaseTableName=").append(tableName);
+                .append("collectionName=").append(collectionName).append("***")
+                .append("rowKey=").append(doc.getFieldValue("id")).append("***");
+        if(logFields != null) {
+            for(String field : logFields) {
+                sb.append(field).append("=").append(doc.getFieldValue(field)).append("***");
+            }
+        }
+        sb.append("hbaseTableName=").append(tableName);
         out.write((sb.toString() + "\n").getBytes());
     }
 
 
 
-    public void logErrorRecord(Result result, String applicationNum) throws IOException {
+    public void logErrorRecord(Result result, ListMultimap<String, Object> fields) throws IOException {
         if(!enableErrorLog) return;
         lock.lock();
         try {
             initErrorOutput();
-            errorOut.write((getString(result, applicationNum) + "\n").getBytes());
+            errorOut.write((getString(result, fields) + "\n").getBytes());
         } finally {
             lock.unlock();
         }
     }
 
-    public String getString(Result result, String applicationNum) throws IOException {
+    public String getString(Result result, ListMultimap<String, Object> fields) throws IOException {
         sb.setLength(0);
         sb.append("time=").append(current()).append("***")
-                .append("collectionName=").append(indexName).append("***")
-                .append("rowKey=").append(new String(result.getRow())).append("***")
-                .append("applicationNum=").append(applicationNum).append("***")
-                .append("hbaseTableName=").append(tableName);
+                .append("collectionName=").append(collectionName).append("***")
+                .append("rowKey=").append(new String(result.getRow())).append("***");
+        if(logFields != null) {
+            for(String field : logFields) {
+                List list = fields.get(field);
+                if(list != null && list.size() > 0) {
+                    sb.append(field).append("=").append(list.get(0)).append("***");
+                }
+
+            }
+        }
+        sb.append("hbaseTableName=").append(tableName);
         return sb.toString();
     }
 

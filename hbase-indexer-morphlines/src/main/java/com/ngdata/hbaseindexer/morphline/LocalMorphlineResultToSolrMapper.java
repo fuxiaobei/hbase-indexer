@@ -258,42 +258,15 @@ final class LocalMorphlineResultToSolrMapper implements ResultToSolrMapper, Conf
                     numFailedRecords.mark();
                     LOG.warn("Morphline {} failed to process oneRecord: {}", morphlineFileAndId, record);
                 }
-//                /*********************************************modify***************************************************************/
-//                try {
-//                    if(solrUpdateWriter instanceof IdAddingSolrUpdateWriter) {
-//                        logWriter.logRightRecord(((IdAddingSolrUpdateWriter) solrUpdateWriter).getTableName() ,result, record);
-//                    } else {
-//                        RowAndFamilyAddingSolrUpdateWriter writer = (RowAndFamilyAddingSolrUpdateWriter) solrUpdateWriter;
-//                        IdAddingSolrUpdateWriter delegateWriter = (IdAddingSolrUpdateWriter) writer.getDelegateUpdateWriter();
-//                        logWriter.logRightRecord(delegateWriter.getTableName(), result, record);
-//                    }
-//                } catch (IOException e) {
-//                    throw new MorphlineRuntimeException(e);
-//                }
-//                /*********************************************modify***************************************************************/
-
             } catch (RuntimeException t) {
                 numExceptionRecords.mark();
                 morphlineContext.getExceptionHandler().handleException(t, record);
                 /*********************************************modify***************************************************************/
-//                try {
-//                    if(solrUpdateWriter instanceof IdAddingSolrUpdateWriter) {
-//                        logWriter.logErrorRecord(((IdAddingSolrUpdateWriter) solrUpdateWriter).getTableName(), result, record);
-//                    } else {
-//                        RowAndFamilyAddingSolrUpdateWriter writer = (RowAndFamilyAddingSolrUpdateWriter) solrUpdateWriter;
-//                        IdAddingSolrUpdateWriter delegateWriter = (IdAddingSolrUpdateWriter) writer.getDelegateUpdateWriter();
-//                        logWriter.logErrorRecord(delegateWriter.getTableName(), result, record);
-//                    }
-//                } catch (IOException e) {
-//                    throw new MorphlineRuntimeException(e);
-//                }
                 if(ThreadLocalContext.getContext() != null ) {
                     LogWriter logWriter = (LogWriter) ThreadLocalContext.getContext().get("logWriter");
                     if(logWriter != null) {
-                        String applicationNum = record.get("full-applicationNum") != null && record.get("full-applicationNum").size() > 0
-                                ? (String)record.get("full-applicationNum").get(0): "";
                         try {
-                            logWriter.logErrorRecord(result, applicationNum);
+                            logWriter.logErrorRecord(result, record.getFields());
                         } catch (IOException e) {
                             throw new MorphlineRuntimeException(e);
                         }

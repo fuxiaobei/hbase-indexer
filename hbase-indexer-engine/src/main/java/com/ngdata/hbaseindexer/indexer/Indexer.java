@@ -108,8 +108,6 @@ public abstract class Indexer {
         this.indexingTimer = Metrics.newTimer(metricName(getClass(),
                 "Index update calculation timer", indexerName),
                 TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-//        logWriter = new LogWriter(indexerName, tableName);
-//        System.out.println("~~~~init indexer: " + logWriter);
     }
 
     /**
@@ -140,13 +138,10 @@ public abstract class Indexer {
         SolrUpdateCollector updateCollector = new SolrUpdateCollector(rowDataList.size());
         TimerContext timerContext = indexingTimer.time();
 
-        LogWriter logWriter = null;
-
         /*********************************************modify***************************************************************/
-        //        logWriter.setConfig(conf.getGlobalParams());
         if (ThreadLocalContext.getContext() == null) {
-            LogWriterPool logWriterPool = LogWriterPool.getInstance(conf.getGlobalParams());
-            logWriter = logWriterPool.get(indexerName, tableName);
+            LogWriterPool logWriterPool = LogWriterPool.getInstance(conf);
+            LogWriter logWriter = logWriterPool.get(indexerName, tableName);
             Map<String, Object> context = new HashMap<String, Object>();
             context.put("collection", indexerName);
             context.put("logWriter", logWriter);
